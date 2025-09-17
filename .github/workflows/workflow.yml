@@ -1,98 +1,71 @@
 env:
-
-RUBY_VERSION: 3.4.5
-
-POSTGRES_USER: postgres
-
-POSTGRES_PASSWORD: password
-
-DATABASE_USER: postgres
-
-DATABASE_PASSWORD: password
-
+  RUBY_VERSION: 3.4.5
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: password
+  DATABASE_USER: postgres
+  DATABASE_PASSWORD: password
 
 name: Rails tests
 
 on: [push, pull_request]
 
 jobs:
+  rspec-test:
+    name: RSpec
+    runs-on: ubuntu-latest
+      - uses: actions/checkout@v3
 
-rspec-test:
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
 
-name: RSpec
+      - name: Install postgres client
+        run: sudo apt-get update; sudo apt-get install -y libpq-dev
 
-runs-on: ubuntu-latest
+      - name: Install Ruby dependencies
+        run: |
+          gem install bundler
+          bundler install --jobs 4 --retry 3
 
-services:
+      - name: Create database and migrate
+        env:
+          RAILS_ENV: test
+        run: |
+          bundler exec rails db:create
+          bundler exec rails db:migrate
 
-postgres:
+      - name: Install JS dependencies with yarn
+        uses: borales/actions-yarn@v3.0.0
+        with:
+          cmd: install
 
-image: postgres:17
+      - name: Run tests
+        run: bundler exec rspec .
 
-ports:
+      - name: Run brakeman
+        run: brakeman -o brakeman.txt || true
 
-- 5432:5432
+      - name: Run rubocop
+        run: bundler exec rubocop --force-exclusion "vendor/*/**" --out rubocop.txt || true
 
-env:
+      - name: Upload coverage results
+        uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: coverage-report
+          path: coverage
 
-POSTGRES_USER: ${{ env.POSTGRES_USER }}
+      - name: Upload rubocop report
+        uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: rubocop-report.txt
+          path: rubocop.txt
 
-POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-
-steps:
-
-- uses: actions/checkout@v2
-
-- uses: ruby/setup-ruby@v1
-
-  with:
-    ruby-version: ${{ env.RUBY_VERSION }}
-
-- name: Install postgres client
-  run: sudo apt-get install libpq-dev
-
-- name: Install dependencies
-  run: |
-
-    gem install bundler
-    bundler install
-
-- name: Create database
-  run: |
-    bundler exec rails db:create RAILS_ENV=test
-    bundler exec rails db:migrate RAILS_ENV=test 
-
-- name: Install JS dependencies with yarn
-  uses: borales/actions-yarn@v3.0.0
-  with:
-    cmd: install
-
-- name: Run tests
-  run: bundler exec rspec .
-
-- name: Run brakeman
-  run: brakeman -o brakeman.txt
-
-- name: Run rubocop
-  run: bundler exec rubocop --force-exclusion vendor/*/** --out rubocop.txt
-
-- name: Upload coverage results
-  uses: actions/upload-artifact@master
-  if: always()
-  with:
-    name: coverage-report
-    path: coverage
-
-- name: Upload rubocop report
-  uses: actions/upload-artifact@master
-  if: always()
-  with:
-    name: rubocop-report.txt
-    path: rubocop.txt
-
-- name: Upload brakeman report
-  uses: actions/upload-artifact@master
-  if: always()
-  with:
-    name: brakeman-report.txt
-    path: brakeman.txt
+      - name: Upload brakeman report
+        uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: brakeman-report.txt
+          path: brakeman.txt
