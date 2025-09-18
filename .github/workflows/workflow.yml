@@ -1,13 +1,13 @@
+name: Rails tests
+
+on: [push, pull_request]
+
 env:
   RUBY_VERSION: 3.4.5
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: password
   DATABASE_USER: postgres
   DATABASE_PASSWORD: password
-
-name: Rails tests
-
-on: [push, pull_request]
 
 jobs:
   rspec-test:
@@ -17,45 +17,47 @@ jobs:
       postgres:
         image: postgres:17
         ports:
-          env:
-            RUBY_VERSION: 3.4.5
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: password
-            DATABASE_USER: postgres
-            DATABASE_PASSWORD: password
+          - 5432:5432
+        env:
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
 
-          name: Rails tests
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
 
-          on: [push, pull_request]
+      - name: Install dependencies
+        run: bundle install --jobs 4 --retry 3
 
-          jobs:
-            rspec-test:
-              name: RSpec
-              runs-on: ubuntu-latest
-              services:
-                postgres:
-                  image: postgres:17
-                  ports:
-                    - 5432:5432
-                  env:
-                    POSTGRES_USER: ${{ env.POSTGRES_USER }}
-                    POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+      - name: Set up database
+        run: |
+          bin/rails db:create
+          bin/rails db:schema:load
 
-              steps:
-      with:
-        name: coverage-report
-        path: coverage
+      - name: Run RSpec tests
+        run: bundle exec rspec
 
-    - name: Upload rubocop report
-      uses: actions/upload-artifact@master
-      if: always()
-      with:
-        name: rubocop-report.txt
-        path: rubocop.txt
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage
 
-    - name: Upload brakeman report
-      uses: actions/upload-artifact@master
-      if: always()
-      with:
-        name: brakeman-report.txt
-        path: brakeman.txt
+      - name: Upload rubocop report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rubocop-report.txt
+          path: rubocop.txt
+
+      - name: Upload brakeman report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brakeman-report.txt
+          path: brakeman.txt
