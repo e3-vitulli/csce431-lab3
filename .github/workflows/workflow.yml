@@ -46,21 +46,21 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-report
           path: coverage
 
       - name: Upload rubocop report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: rubocop-report.txt
           path: rubocop.txt
 
       - name: Upload brakeman report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: brakeman-report.txt
           path: brakeman.txt
